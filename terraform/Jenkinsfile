@@ -17,47 +17,51 @@ spec:
 properties([
     parameters([
         choice(choices: ['apply', 'destroy'], description: 'Provide your choice', name: 'action')
-        ])
-        ])
+        string(name: 'ami_id', defaultValue: '', description: 'AMI ID'),
+        choice(name: 'REGION', choices: ['us-east-1', 'us-east-2', 'us-west-1', 'us-west-2'], description: 'Select AWS Region')
+    ])
+])
+
 
 podTemplate(cloud: 'kubernetes', label: 'terraform', yaml: template) {
     node ("terraform") {
         container("terraform") {
-    stage ("Pull code") {
-        git branch: 'main', url: 'https://github.com/GMakarova/Jenkins-April-2024.git'
-    }
-    
-    withCredentials([usernamePassword(credentialsId: 'aws-creds', passwordVariable: 'AWS_SECRET_ACCESS_KEY', usernameVariable: 'AWS_ACCESS_KEY_ID')]) {
+            stage ("Pull code") {
+                git branch: 'main', url: 'https://github.com/VKhusaeva/jenkins-april-2024.git'
+            }
 
-    stage ("Init") {
-        sh """
-        cd terraform
-        terraform init
-        """
-    }
+            stage ("Write tfvars") {
+                writeFile file: 'terraform.tfvars', text: """
+                ami_id = "${params.ami_id}"
+                region = "${params.region}"
+                """
+            }
 
-    if(params.action == "apply") {
-        stage ("Apply") {
+            withCredentials([usernamePassword(credentialsId: 'aws-creds', passwordVariable: 'AWS_SECRET_ACCESS_KEY', usernameVariable: 'AWS_ACCESS_KEY_ID')]) {
+                stage ("Init") {
+                    sh """
+                    cd terraform
+                    terraform init
+                    """
+                }
 
-        sh """
-        cd terraform 
-        terraform apply -auto-approve
-        """
+                if (params.action == "apply") {
+                    stage ("Apply") {
+                        sh """
+                        cd terraform
+                        terraform apply -auto-approve -var "ami_id=${params.ami_id}" -var "region=${params.region}"
+                        """
+                    }
+                } else {
+                    stage ("Destroy") {
+                        sh """
+                        cd terraform
+                        terraform destroy -auto-approve -var "ami_id=${params.ami_id}" -var "region=${params.region}"
+                        """
+                    }
+                }
+            }
         }
-    }
-
-    if(params.action =="destroy") {
-            stage ("Destroy") {
-
-        sh """
-        cd terraform 
-        terraform destroy -auto-approve
-        """
-        }
-    }
-}
-
-}
     }
 }
 
