@@ -29,25 +29,26 @@ podTemplate(cloud: 'kubernetes', label: 'terraform', yaml: template) {
                 git branch: 'main', url: 'https://github.com/GMakarova/Jenkins-April-2024.git'
             }
 
+          stage ("Write tfvars") {
+                writeFile file: 'terraform.tfvars', text: """
+                ami_id = "${params.ami_id}"
+                region = "${params.region}"
+                """
+            }
+
             withCredentials([usernamePassword(credentialsId: 'aws-creds', passwordVariable: 'AWS_SECRET_ACCESS_KEY', usernameVariable: 'AWS_ACCESS_KEY_ID')]) {
                 stage ("Init") {
                     sh """
                     cd terraform
                     terraform init
                     """
+                }
 
-        def tfvarsContent = """
-ami_id = "${params.AMI_ID}"
-region = "${params.REGION}"
-        """
-        writeFile file: 'terraform/terraform.tfvars', text: tfvarsContent
-}
-      
     if(params.action == "apply") {
         stage ("Apply") {
         sh """
         cd terraform
-        terraform apply -var-file=terraform.tfvars -auto-approve
+        terraform apply -auto-approve -var "ami_id=${params.ami_id}" -var "region=${params.region}"
         """
       }
     }
@@ -56,7 +57,7 @@ region = "${params.REGION}"
         stage ("Destroy") {
         sh """
         cd terraform
-        terraform destroy -var-file=terraform.tfvars -auto-approve
+        terraform destroy -auto-approve -var "ami_id=${params.ami_id}" -var "region=${params.region}"
         """
           }
         }
